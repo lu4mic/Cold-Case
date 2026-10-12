@@ -1,0 +1,2 @@
+"""Cold Case application package."""
+

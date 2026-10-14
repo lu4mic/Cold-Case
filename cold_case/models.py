@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from uuid import UUID, uuid4
 
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 
 def utc_now() -> datetime:
@@ -105,3 +105,50 @@ class Case(BaseModel):
     timeline: list[TimelineEvent] = Field(default_factory=list)
     player_state: PlayerState | None = None
     messages: list[ConversationMessage] = Field(default_factory=list)
+
+
+class PublicModel(BaseModel):
+    """Base for responses built from internal Pydantic or database objects."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PublicCase(PublicModel):
+    """Case information safe to show to a player."""
+
+    id: UUID
+    title: str
+    introduction: str
+    location: str
+    victim_or_event: str
+    status: GameStatus
+    created_at: AwareDatetime
+
+
+class PublicSuspect(PublicModel):
+    """Suspect information that contains no hidden case truth."""
+
+    id: UUID
+    name: str
+    role: str
+    personality: str
+    public_background: str
+
+
+class PublicClue(PublicModel):
+    """Discovered evidence safe to show to a player."""
+
+    id: UUID
+    title: str
+    description: str
+    location: str
+    relevance: str
+
+
+class PublicPlayerState(PublicModel):
+    """Investigation progress safe to show to a player."""
+
+    discovered_clue_ids: list[UUID]
+    interrogated_suspect_ids: list[UUID]
+    accusation: UUID | None
+    game_status: GameStatus

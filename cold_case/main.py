@@ -4,13 +4,16 @@ import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import NoResultFound
 
 from cold_case.database.connection import (
     check_database_connection,
     create_database_engine,
     create_session_factory,
 )
+from cold_case.routers import cases, health
 
 REQUIRED_ENVIRONMENT_VARIABLES = ["DATABASE_URL", "OPENAI_API_KEY"]
 
@@ -43,3 +46,20 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
 
 
 app = FastAPI(title="Cold Case", lifespan=lifespan)
+
+
+@app.exception_handler(NoResultFound)
+async def case_not_found(
+    request: Request,
+    error: NoResultFound,
+) -> JSONResponse:
+    """Translate a missing database case into a public HTTP response."""
+
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={"detail": "Case not found"},
+    )
+
+
+app.include_router(cases.router)
+app.include_router(health.router)

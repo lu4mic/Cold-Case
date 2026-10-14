@@ -8,6 +8,10 @@ from cold_case.models import (
     ConversationMessage,
     MessageRole,
     PlayerState,
+    PublicCase,
+    PublicClue,
+    PublicPlayerState,
+    PublicSuspect,
     Suspect,
     TimelineEvent,
 )
@@ -108,3 +112,34 @@ def test_case_has_safe_defaults() -> None:
     assert mystery.timeline == []
     assert mystery.player_state is None
     assert mystery.messages == []
+
+
+def test_public_models_expose_only_player_safe_case_information() -> None:
+    mystery = make_case()
+    player_state = mystery.player_state
+    assert player_state is not None
+
+    public_payloads = [
+        PublicCase.model_validate(mystery).model_dump(),
+        PublicSuspect.model_validate(mystery.suspects[0]).model_dump(),
+        PublicClue.model_validate(mystery.clues[0]).model_dump(),
+        PublicPlayerState.model_validate(player_state).model_dump(),
+    ]
+    exposed_fields = set().union(*(payload.keys() for payload in public_payloads))
+    forbidden_fields = {
+        "culprit_id",
+        "is_culprit",
+        "motive",
+        "private_knowledge",
+        "secret",
+        "lie_strategy",
+        "timeline",
+        "discovered",
+        "related_suspect_ids",
+    }
+
+    assert exposed_fields.isdisjoint(forbidden_fields)
+    assert public_payloads[0]["title"] == mystery.title
+    assert public_payloads[1]["name"] == mystery.suspects[0].name
+    assert public_payloads[2]["title"] == mystery.clues[0].title
+    assert public_payloads[3]["game_status"] == player_state.game_status

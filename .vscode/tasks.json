@@ -1,0 +1,67 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Python: Sync dependencies",
+      "type": "process",
+      "command": "uv",
+      "args": [
+        "sync",
+        "--all-groups"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Start debug PostgreSQL",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "--detach",
+        "--name",
+        "cold-case-db",
+        "--security-opt",
+        "no-new-privileges=true",
+        "--env",
+        "POSTGRES_DB=cold_case",
+        "--env",
+        "POSTGRES_USER=local_user",
+        "--env",
+        "POSTGRES_PASSWORD=local_db_password",
+        "--publish",
+        "127.0.0.1:5432:5432",
+        "--volume",
+        "cold_case_postgres_data:/var/lib/postgresql/data",
+        "postgres:17.11-bookworm"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Prepare debug application",
+      "type": "process",
+      "command": "bash",
+      "args": [
+        "-c",
+        "for attempt in {1..30}; do if docker exec cold-case-db pg_isready --username local_user --dbname cold_case >/dev/null 2>&1; then uv run alembic upgrade head; exit $?; fi; sleep 1; done; docker logs cold-case-db; exit 1"
+      ],
+      "options": {
+        "env": {
+          "DATABASE_URL": "postgresql+psycopg://local_user:local_db_password@127.0.0.1:5432/cold_case"
+        }
+      },
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Python: Sync dependencies",
+        "Start debug PostgreSQL"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Stop debug PostgreSQL",
+      "type": "shell",
+      "command": "docker stop cold-case-db || true",
+      "problemMatcher": []
+    }
+  ]
+}

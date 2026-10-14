@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Cold Case: Run application",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "cold_case.main:app",
+        "--reload",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
+      "env": {
+        "DATABASE_URL": "postgresql+psycopg://local_user:local_db_password@127.0.0.1:5432/cold_case",
+        "OPENAI_API_KEY": "local-development-placeholder"
+      },
+      "preLaunchTask": "Prepare debug application",
+      "postDebugTask": "Stop debug PostgreSQL",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ]
+}

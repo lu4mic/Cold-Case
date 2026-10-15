@@ -16,7 +16,7 @@ from cold_case.database.connection import (
 from cold_case.game import Game
 from cold_case.routers import cases, health
 
-REQUIRED_ENVIRONMENT_VARIABLES = ["DATABASE_URL", "OPENAI_API_KEY"]
+REQUIRED_ENVIRONMENT_VARIABLES = ["DATABASE_URL"]
 
 
 @asynccontextmanager

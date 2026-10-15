@@ -26,7 +26,7 @@ class FakeDatabaseEngine:
 async def test_database_configuration_and_application_lifetime(
     monkeypatch: MonkeyPatch,
 ) -> None:
-    """Configure, start, exercise, and stop the app as one scenario."""
+    """Require a database, start without an AI key, and release resources."""
 
     database_url = "postgresql+psycopg://detective:secret@localhost/test_case"
     fake_database_engine = FakeDatabaseEngine()
@@ -39,13 +39,12 @@ async def test_database_configuration_and_application_lifetime(
 
     with raises(
         ValueError,
-        match="DATABASE_URL, OPENAI_API_KEY",
+        match="Missing required environment variables: DATABASE_URL$",
     ):
         async with application.router.lifespan_context(application):
             raise AssertionError("startup unexpectedly accepted missing variables")
 
     monkeypatch.setenv("DATABASE_URL", database_url)
-    monkeypatch.setenv("OPENAI_API_KEY", "test-api-key")
     monkeypatch.setattr(
         main,
         "create_database_engine",

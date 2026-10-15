@@ -49,7 +49,6 @@ async def test_case_routes_as_one_player_scenario(
     )
 
     monkeypatch.setenv("DATABASE_URL", database_url)
-    monkeypatch.setenv("OPENAI_API_KEY", "integration-test-key")
 
     async with database_engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)

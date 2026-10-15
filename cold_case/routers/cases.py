@@ -84,3 +84,23 @@ async def find_case_clue(
         )
 
     return PublicClue.model_validate(clue)
+
+@router.post(
+    "/{case_id}/accuse/{suspect_id}",
+    response_model=PublicPlayerState,
+    status_code=status.HTTP_200_OK,
+)
+async def accuse_suspect(
+    case_id: UUID,
+    suspect_id: UUID,
+    request: Request,
+) -> PublicPlayerState:
+    player_state = await request.app.state.game.final_accusation(case_id, suspect_id)
+
+    if player_state is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Suspect not found",
+        )
+
+    return PublicPlayerState.model_validate(player_state)

@@ -5,8 +5,12 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from cold_case.database.queries import get_case, save_clue_discovery
-from cold_case.models import Clue
+from cold_case.database.queries import (
+    get_case,
+    save_clue_discovery,
+    save_final_accusation,
+)
+from cold_case.models import Clue, GameStatus, PlayerState
 
 
 class Game:
@@ -41,3 +45,41 @@ class Game:
                 clue.discovered = True
 
             return clue
+
+    async def final_accusation(
+        self,
+        case_id: UUID,
+        suspect_id: UUID,
+    ) -> PlayerState | None:
+        """Record the final accusation and return the backend-decided outcome."""
+
+        async with self.session_factory.begin() as session:
+            mystery = await get_case(session, case_id)
+
+            suspect = next(
+                (suspect for suspect in mystery.suspects if suspect.id == suspect_id),
+                None,
+            )
+
+            if suspect is None:
+                return None
+
+            player_state = mystery.player_state or PlayerState(case_id=case_id)
+
+            if player_state.accusation is not None:
+                return player_state
+
+            player_state.accusation = suspect.id
+            player_state.game_status = (
+                GameStatus.WON
+                if suspect.id == mystery.culprit_id
+                else GameStatus.LOST
+            )
+            await save_final_accusation(
+                session,
+                case_id,
+                suspect.id,
+                player_state.game_status,
+            )
+
+            return player_state

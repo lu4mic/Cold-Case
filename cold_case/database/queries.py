@@ -148,6 +148,30 @@ async def save_clue_discovery(
     await session.flush()
 
 
+async def save_final_accusation(
+    session: AsyncSession,
+    case_id: UUID,
+    suspect_id: UUID,
+    game_status: GameStatus,
+) -> None:
+    """Persist one final accusation and its backend-decided outcome."""
+
+    stored_case = (
+        await session.execute(select(CaseTable).where(CaseTable.id == case_id))
+    ).scalar_one()
+    stored_player_state = (
+        await session.execute(
+            select(PlayerStateTable).where(PlayerStateTable.case_id == case_id)
+        )
+    ).scalar_one()
+
+    stored_case.status = game_status.value
+    stored_player_state.accusation = suspect_id
+    stored_player_state.game_status = game_status.value
+
+    await session.flush()
+
+
 async def get_case(session: AsyncSession, case_id: UUID) -> Case:
     """Load one complete case or raise when its ID does not exist."""
 

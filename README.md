@@ -12,7 +12,8 @@ The most important design rule is:
 The repository already contains typed internal/public models, PostgreSQL storage
 and an Alembic migration, public read routes, clue discovery, and final accusation
 logic. Case generation and suspect interrogation are not implemented yet. There
-is no CI workflow; the existing behavior still needs the verification tracked below.
+is a static-check CI workflow; database and gameplay verification are not yet
+automated. Existing behavior still needs the verification tracked below.
 
 ## Start here
 
@@ -86,8 +87,11 @@ test database. A passing run with that test skipped does not verify persistence
 or route behavior. Do not point tests at a database containing application data:
 the scenario creates tables and writes/deletes its own case records.
 
-Lint, typing and PostgreSQL checks are not yet established as a passing CI
-baseline; [issue #2](https://github.com/lu4mic/Cold-Case/issues/2) tracks that work.
+[Static checks](.github/workflows/static-checks.yml) run Ruff and strict mypy on
+pull requests and pushes to `main`, using Python 3.12 and locked dependencies.
+The workflow does not start the API, connect to PostgreSQL or call a model.
+Passing static checks does not verify gameplay or migrations; automated test and
+PostgreSQL coverage remain in [issue #2](https://github.com/lu4mic/Cold-Case/issues/2).
 
 ## Configuration
 

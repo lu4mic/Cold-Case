@@ -1,6 +1,5 @@
-"""PostgreSQL-backed scenario test for the read-only case API."""
+"""PostgreSQL-backed scenario test for the case API."""
 
-import json
 import os
 from typing import cast
 from uuid import uuid4
@@ -28,15 +27,16 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-async def test_read_only_case_routes_as_one_player_scenario(
+async def test_case_routes_as_one_player_scenario(
     monkeypatch: MonkeyPatch,
 ) -> None:
-    """Store a case, read every public view, and verify hidden truth stays hidden."""
+    """Read a case, discover evidence, and keep other case data protected."""
 
     database_url = cast(str, TEST_DATABASE_URL)
     database_engine = create_database_engine(database_url)
     session_factory = create_session_factory(database_engine)
     mystery = make_case()
+    other_mystery = make_case()
     mystery.clues[0].discovered = True
     mystery.clues.append(
         Clue(
@@ -56,6 +56,7 @@ async def test_read_only_case_routes_as_one_player_scenario(
 
     async with session_factory.begin() as session:
         await create_case(session, mystery)
+        await create_case(session, other_mystery)
 
     try:
         async with app.router.lifespan_context(app), AsyncClient(
@@ -68,6 +69,39 @@ async def test_read_only_case_routes_as_one_player_scenario(
             clues_response = await client.get(f"/cases/{mystery.id}/clues")
             state_response = await client.get(f"/cases/{mystery.id}/state")
             missing_response = await client.get(f"/cases/{uuid4()}")
+
+            discovered_clue = mystery.clues[1]
+            discovery_response = await client.post(
+                f"/cases/{mystery.id}/clues/{discovered_clue.id}/discover"
+            )
+            discovered_clues_response = await client.get(
+                f"/cases/{mystery.id}/clues"
+            )
+            discovered_state_response = await client.get(
+                f"/cases/{mystery.id}/state"
+            )
+            repeated_discovery_response = await client.post(
+                f"/cases/{mystery.id}/clues/{discovered_clue.id}/discover"
+            )
+            repeated_state_response = await client.get(
+                f"/cases/{mystery.id}/state"
+            )
+            missing_clue_response = await client.post(
+                f"/cases/{mystery.id}/clues/{uuid4()}/discover"
+            )
+            missing_case_discovery_response = await client.post(
+                f"/cases/{uuid4()}/clues/{discovered_clue.id}/discover"
+            )
+            cross_case_response = await client.post(
+                f"/cases/{mystery.id}/clues/"
+                f"{other_mystery.clues[0].id}/discover"
+            )
+            other_clues_response = await client.get(
+                f"/cases/{other_mystery.id}/clues"
+            )
+            other_state_response = await client.get(
+                f"/cases/{other_mystery.id}/state"
+            )
 
         assert health_response.status_code == 200
         assert health_response.json() == {"status": "ok"}
@@ -89,14 +123,47 @@ async def test_read_only_case_routes_as_one_player_scenario(
         assert state_response.json()["game_status"] == "in_progress"
         assert missing_response.status_code == 404
         assert missing_response.json() == {"detail": "Case not found"}
+        assert discovery_response.status_code == 200
+        assert discovery_response.json() == {
+            "id": str(discovered_clue.id),
+            "title": discovered_clue.title,
+            "description": discovered_clue.description,
+            "location": discovered_clue.location,
+            "relevance": discovered_clue.relevance,
+        }
+        assert discovered_clues_response.status_code == 200
+        assert [
+            clue["id"] for clue in discovered_clues_response.json()
+        ] == [str(mystery.clues[0].id), str(discovered_clue.id)]
+        assert discovered_state_response.status_code == 200
+        assert discovered_state_response.json()["discovered_clue_ids"] == [
+            str(discovered_clue.id)
+        ]
+        assert repeated_discovery_response.status_code == 200
+        assert repeated_discovery_response.json() == discovery_response.json()
+        assert repeated_state_response.status_code == 200
+        assert repeated_state_response.json()["discovered_clue_ids"] == [
+            str(discovered_clue.id)
+        ]
+        assert missing_clue_response.status_code == 404
+        assert missing_clue_response.json() == {"detail": "Clue not found"}
+        assert missing_case_discovery_response.status_code == 404
+        assert missing_case_discovery_response.json() == {"detail": "Case not found"}
+        assert cross_case_response.status_code == 404
+        assert cross_case_response.json() == {"detail": "Clue not found"}
+        assert other_clues_response.status_code == 200
+        assert other_clues_response.json() == []
+        assert other_state_response.status_code == 200
+        assert other_state_response.json()["discovered_clue_ids"] == []
 
-        serialized_responses = json.dumps(
-            [
-                case_response.json(),
-                suspects_response.json(),
-                clues_response.json(),
-                state_response.json(),
-            ]
+        public_payloads = [
+            case_response.json(),
+            discovered_state_response.json(),
+            *suspects_response.json(),
+            *discovered_clues_response.json(),
+        ]
+        exposed_fields = set().union(
+            *(payload.keys() for payload in public_payloads)
         )
         forbidden_fields = {
             "culprit_id",
@@ -110,11 +177,12 @@ async def test_read_only_case_routes_as_one_player_scenario(
             "related_suspect_ids",
         }
 
-        assert all(
-            forbidden_field not in serialized_responses
-            for forbidden_field in forbidden_fields
-        )
+        assert exposed_fields.isdisjoint(forbidden_fields)
     finally:
         async with session_factory.begin() as session:
-            await session.execute(delete(CaseTable).where(CaseTable.id == mystery.id))
+            await session.execute(
+                delete(CaseTable).where(
+                    CaseTable.id.in_([mystery.id, other_mystery.id])
+                )
+            )
         await database_engine.dispose()

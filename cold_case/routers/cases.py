@@ -6,7 +6,7 @@ from uuid import UUID
 
 from cold_case.database.queries import get_case
 from cold_case.models import PublicCase, PublicClue, PublicPlayerState, PublicSuspect
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(
@@ -18,7 +18,7 @@ router = APIRouter(
 async def database_session(request: Request) -> AsyncGenerator[AsyncSession]:
     """Provide one database session for the current request."""
 
-    async with request.app.state.session_factory() as session:
+    async with request.app.state.session_factory.begin() as session:
         yield session
 
 
@@ -63,3 +63,24 @@ async def find_case_state(case_id: UUID, session: DatabaseSession) -> PublicPlay
     mystery = await get_case(session, case_id)
 
     return PublicPlayerState.model_validate(mystery.player_state)
+
+
+@router.post(
+    "/{case_id}/clues/{clue_id}/discover",
+    response_model=PublicClue,
+    status_code=status.HTTP_200_OK,
+)
+async def find_case_clue(
+    case_id: UUID,
+    clue_id: UUID,
+    request: Request,
+) -> PublicClue:
+    clue = await request.app.state.game.discover_clue(case_id, clue_id)
+
+    if clue is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Clue not found",
+        )
+
+    return PublicClue.model_validate(clue)

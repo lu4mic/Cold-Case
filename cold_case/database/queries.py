@@ -94,7 +94,11 @@ async def create_case(session: AsyncSession, mystery: Case) -> None:
             accusation=player_state.accusation,
             game_status=player_state.game_status.value,
         ),
-        messages=[
+    )
+    session.add(stored_case)
+    await session.flush()
+    session.add_all(
+        [
             ConversationMessageTable(
                 id=message.id,
                 case_id=mystery.id,
@@ -104,11 +108,43 @@ async def create_case(session: AsyncSession, mystery: Case) -> None:
                 created_at=message.created_at,
             )
             for message in mystery.messages
-        ],
+        ]
     )
-    session.add(stored_case)
     await session.flush()
     stored_case.culprit_id = mystery.culprit_id
+    await session.flush()
+
+
+async def save_clue_discovery(
+    session: AsyncSession,
+    case_id: UUID,
+    clue_id: UUID,
+) -> None:
+    """Persist one clue discovery in the current transaction."""
+
+    stored_clue = (
+        await session.execute(
+            select(ClueTable).where(
+                ClueTable.id == clue_id,
+                ClueTable.case_id == case_id,
+            )
+        )
+    ).scalar_one()
+    stored_player_state = (
+        await session.execute(
+            select(PlayerStateTable).where(PlayerStateTable.case_id == case_id)
+        )
+    ).scalar_one()
+    discovered_clue_id = str(clue_id)
+
+    stored_clue.discovered = True
+
+    if discovered_clue_id not in stored_player_state.discovered_clue_ids:
+        stored_player_state.discovered_clue_ids = [
+            *stored_player_state.discovered_clue_ids,
+            discovered_clue_id,
+        ]
+
     await session.flush()
 
 

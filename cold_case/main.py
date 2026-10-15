@@ -13,6 +13,7 @@ from cold_case.database.connection import (
     create_database_engine,
     create_session_factory,
 )
+from cold_case.game import Game
 from cold_case.routers import cases, health
 
 REQUIRED_ENVIRONMENT_VARIABLES = ["DATABASE_URL", "OPENAI_API_KEY"]
@@ -38,8 +39,10 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
 
     try:
         await check_database_connection(database_engine)
+        session_factory = create_session_factory(database_engine)
         application.state.database_engine = database_engine
-        application.state.session_factory = create_session_factory(database_engine)
+        application.state.session_factory = session_factory
+        application.state.game = Game(session_factory)
         yield
     finally:
         await database_engine.dispose()

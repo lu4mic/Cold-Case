@@ -12,7 +12,7 @@ The most important design rule is:
 The repository already contains typed internal/public models, PostgreSQL storage
 and an Alembic migration, public read routes, clue discovery, and final accusation
 logic. Case generation and suspect interrogation are not implemented yet. There
-is a static-check CI workflow; database and gameplay verification are not yet
+is an offline-check CI workflow; database and gameplay verification are not yet
 automated. Existing behavior still needs the verification tracked below.
 
 ## Start here
@@ -87,11 +87,21 @@ test database. A passing run with that test skipped does not verify persistence
 or route behavior. Do not point tests at a database containing application data:
 the scenario creates tables and writes/deletes its own case records.
 
-[Static checks](.github/workflows/static-checks.yml) run Ruff and strict mypy on
-pull requests and pushes to `main`, using Python 3.12 and locked dependencies.
-The workflow does not start the API, connect to PostgreSQL or call a model.
-Passing static checks does not verify gameplay or migrations; automated test and
-PostgreSQL coverage remain in [issue #2](https://github.com/lu4mic/Cold-Case/issues/2).
+[Offline checks](.github/workflows/static-checks.yml) run Ruff, strict mypy and the
+model/application-lifetime tests on pull requests and pushes to `main`, using
+Python 3.12 and locked dependencies. The tests verify public-model spoiler
+protection, startup without an AI key, database-error propagation and engine
+cleanup without a PostgreSQL connection or model call.
+
+The exact CI test command is:
+
+```bash
+uv run --locked pytest -q tests/test_models.py tests/test_database.py
+```
+
+The PostgreSQL route scenario is not part of this offline job. Passing the offline
+job does not verify persistence, gameplay or migrations; isolated PostgreSQL CI remains
+in [issue #2](https://github.com/lu4mic/Cold-Case/issues/2).
 
 ## Configuration
 

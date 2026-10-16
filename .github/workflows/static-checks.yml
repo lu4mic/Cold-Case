@@ -1,4 +1,4 @@
-name: Static checks
+name: Offline checks
 
 on:
   push:
@@ -35,3 +35,6 @@ jobs:
 
       - name: Check application types
         run: uv run --locked mypy cold_case
+
+      - name: Test models and application lifetime without PostgreSQL
+        run: uv run --locked pytest -q tests/test_models.py tests/test_database.py

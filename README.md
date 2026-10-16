@@ -116,8 +116,8 @@ DATABASE_URL=postgresql+psycopg://cold_case:password@localhost:5432/cold_case
 ```
 
 The database URL above is an example for a local development database. Startup
-requires only `DATABASE_URL`; no AI provider key is needed. No model integration
-exists yet, so do not supply a real provider key.
+requires only a non-blank `DATABASE_URL`; no AI provider key is needed. No model
+integration exists yet, so do not supply a real provider key.
 
 After configuring a local PostgreSQL database and applying the migration, start
 the API bound to loopback:

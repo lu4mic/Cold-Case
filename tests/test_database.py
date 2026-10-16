@@ -26,7 +26,7 @@ class FakeDatabaseEngine:
 async def test_database_configuration_and_application_lifetime(
     monkeypatch: MonkeyPatch,
 ) -> None:
-    """Require a database, start without an AI key, and release resources."""
+    """Reject absent/blank config, start without an AI key, and release resources."""
 
     database_url = "postgresql+psycopg://detective:secret@localhost/test_case"
     fake_database_engine = FakeDatabaseEngine()
@@ -43,6 +43,15 @@ async def test_database_configuration_and_application_lifetime(
     ):
         async with application.router.lifespan_context(application):
             raise AssertionError("startup unexpectedly accepted missing variables")
+
+    for blank_database_url in ("", " \t\n"):
+        monkeypatch.setenv("DATABASE_URL", blank_database_url)
+        with raises(
+            ValueError,
+            match="Missing required environment variables: DATABASE_URL$",
+        ):
+            async with application.router.lifespan_context(application):
+                raise AssertionError("startup accepted a blank DATABASE_URL")
 
     monkeypatch.setenv("DATABASE_URL", database_url)
     monkeypatch.setattr(

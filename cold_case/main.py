@@ -26,7 +26,7 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
     missing_environment_variables = [
         environment_variable
         for environment_variable in REQUIRED_ENVIRONMENT_VARIABLES
-        if environment_variable not in os.environ
+        if not os.environ.get(environment_variable, "").strip()
     ]
 
     if missing_environment_variables:

@@ -103,6 +103,37 @@ The PostgreSQL route scenario is not part of this offline job. Passing the offli
 job does not verify persistence, gameplay or migrations; isolated PostgreSQL CI remains
 in [issue #2](https://github.com/lu4mic/Cold-Case/issues/2).
 
+### Run the PostgreSQL checks locally
+
+Use a new, empty, disposable local PostgreSQL database and a dedicated test role
+with schema-creation permissions. Create them separately before running these
+commands from the repository root. The example below assumes that database and
+role already exist; its password is a local-only example, not a real credential.
+Never substitute a development, shared or production database containing data.
+
+```bash
+export TEST_DATABASE_URL='postgresql+psycopg://cold_case_test:local-test-only@127.0.0.1:5432/cold_case_test'
+DATABASE_URL="$TEST_DATABASE_URL" uv run --locked alembic upgrade head &&
+DATABASE_URL="$TEST_DATABASE_URL" uv run --locked alembic check &&
+uv run --locked pytest -q -rs
+```
+
+The explicit `DATABASE_URL` assignments send Alembic to the same disposable
+database selected by the route test, regardless of the application's usual URL.
+Do not add `--env-file .env` with application credentials to this test sequence.
+The `&&` chain stops before tests if a migration or schema comparison fails.
+
+`alembic check` compares the migrated schema with the SQLAlchemy metadata before
+the route test runs. This matters because the test currently calls `create_all`,
+which can create missing tables and mask an incomplete migration. Investigate
+schema differences rather than assuming a passing route test proves migrations.
+The PostgreSQL scenario must execute, not skip; `-rs` displays any skip reasons.
+
+These commands require PostgreSQL and are not part of the current offline CI.
+Database-backed validation and its automatic CI job remain pending in issue #2.
+Dispose of only the dedicated test database through your local setup afterwards;
+test-record cleanup does not remove its schema or prove migration rollback.
+
 ## Configuration
 
 The application reads environment variables directly with `os.environ`. You may
